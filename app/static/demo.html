@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clinician Directory Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #e8eef2;
+      --bg-accent: #d5e3ea;
+      --ink: #13212b;
+      --muted: #5a6b76;
+      --panel: rgba(255, 252, 248, 0.92);
+      --line: rgba(19, 33, 43, 0.12);
+      --accent: #0f6a6a;
+      --accent-ink: #f4fffe;
+      --user: #1c3340;
+      --bot: #f7f1ea;
+      --danger: #8a3b2d;
+      --radius: 18px;
+      --shadow: 0 18px 50px rgba(19, 33, 43, 0.08);
+      --font: "DM Sans", sans-serif;
+      --display: "Fraunces", Georgia, serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: var(--font);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, var(--bg-accent), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #f0e6d8, transparent 50%),
+        var(--bg);
+    }
+
+    .shell {
+      min-height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 28px 18px 18px;
+      gap: 18px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: clamp(2rem, 4vw, 2.75rem);
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+    }
+
+    header p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 46ch;
+      line-height: 1.45;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.55);
+      border-radius: 999px;
+      padding: 6px 11px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .chip strong { color: var(--ink); font-weight: 600; }
+
+    .panel {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      min-height: min(70vh, 720px);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+    }
+
+    #log {
+      overflow-y: auto;
+      padding: 22px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .msg {
+      max-width: min(92%, 620px);
+      padding: 12px 14px;
+      border-radius: 14px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      font-size: 0.98rem;
+    }
+
+    .msg.user {
+      align-self: flex-end;
+      background: var(--user);
+      color: #f5f8fa;
+    }
+
+    .msg.assistant {
+      align-self: flex-start;
+      background: var(--bot);
+      border: 1px solid var(--line);
+    }
+
+    .msg.system {
+      align-self: center;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.86rem;
+      text-align: center;
+    }
+
+    .msg.error {
+      align-self: stretch;
+      background: #f8e8e4;
+      color: var(--danger);
+      border: 1px solid rgba(138, 59, 45, 0.25);
+    }
+
+    form {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 14px;
+      border-top: 1px solid var(--line);
+      background: rgba(255,255,255,0.55);
+    }
+
+    textarea {
+      resize: none;
+      min-height: 52px;
+      max-height: 140px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 13px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    textarea:focus {
+      outline: 2px solid rgba(15, 106, 106, 0.35);
+      border-color: var(--accent);
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 0 18px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: wait;
+    }
+
+    .hints {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 14px 14px;
+      background: rgba(255,255,255,0.55);
+    }
+
+    .hints button {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      font-weight: 500;
+      font-size: 0.84rem;
+      padding: 8px 11px;
+    }
+
+    footer {
+      color: var(--muted);
+      font-size: 0.82rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    footer a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <h1>Clinician Directory Agent</h1>
+      <p>
+        Multi-turn demo scoped to the Romanian clinician dataset.
+        Ask about speciality, city, language, rating, or experience — nothing outside that directory.
+      </p>
+      <div class="meta">
+        <span class="chip"><strong>Scope</strong> directory only</span>
+        <span class="chip"><strong>Store</strong> SQLite</span>
+        <span class="chip" id="convChip"><strong>Conversation</strong> new</span>
+      </div>
+    </header>
+
+    <main class="panel">
+      <div id="log" aria-live="polite">
+        <div class="msg system">Try a directory question to start a conversation.</div>
+      </div>
+      <div>
+        <div class="hints" id="hints">
+          <button type="button" data-q="Find a cardiologist in Cluj-Napoca who speaks English">Cardiology in Cluj</button>
+          <button type="button" data-q="Who are the highest-rated dermatologists in Bucharest?">Top dermatologists</button>
+          <button type="button" data-q="What specialities are available?">List specialities</button>
+        </div>
+        <form id="chatForm">
+          <textarea id="input" rows="2" placeholder="Ask about clinicians or clinics…" required></textarea>
+          <button type="submit" id="send">Send</button>
+        </form>
+      </div>
+    </main>
+
+    <footer>
+      <span>Follow-ups reuse the same conversation. History resets when the server restarts.</span>
+      <span><a href="/docs">API docs</a> · <a href="/health">health</a></span>
+    </footer>
+  </div>
+
+  <script>
+    const log = document.getElementById("log");
+    const form = document.getElementById("chatForm");
+    const input = document.getElementById("input");
+    const send = document.getElementById("send");
+    const convChip = document.getElementById("convChip");
+    let conversationId = null;
+
+    function addMessage(role, text) {
+      const el = document.createElement("div");
+      el.className = `msg ${role}`;
+      el.textContent = text;
+      log.appendChild(el);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    async function ask(message) {
+      addMessage("user", message);
+      send.disabled = true;
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message,
+            conversation_id: conversationId,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          addMessage("error", data.detail || "Chat request failed");
+          return;
+        }
+        conversationId = data.conversation_id;
+        convChip.innerHTML = `<strong>Conversation</strong> ${conversationId.slice(0, 8)}…`;
+        addMessage("assistant", data.message.content);
+      } catch (err) {
+        addMessage("error", String(err));
+      } finally {
+        send.disabled = false;
+        input.focus();
+      }
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const message = input.value.trim();
+      if (!message) return;
+      input.value = "";
+      ask(message);
+    });
+
+    document.getElementById("hints").addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-q]");
+      if (!button) return;
+      ask(button.dataset.q);
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+.venv
+__pycache__
+*.pyc
+.git
+.env
+data/*.db
+.DS_Store
+*.md
+!README.md
+!ARCHITECTURE.md
