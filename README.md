@@ -6,7 +6,8 @@ Lightweight FastAPI service that:
 2. Exposes structured query endpoints for agents/clients
 3. Hosts a scoped multi-turn conversational agent with a demo UI at `/`
 
-Architecture for hosting the demo: see [ARCHITECTURE.md](ARCHITECTURE.md).
+Architecture for hosting the demo: see [ARCHITECTURE.md](ARCHITECTURE.md).  
+Deploy anywhere (Docker + Terraform / Rancher): see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Why SQLite
 
