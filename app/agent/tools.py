@@ -29,8 +29,9 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "function": {
             "name": "search_clinicians",
             "description": (
-                "Search clinicians with structured filters. Use exact facet values from "
-                "list_facets when possible."
+                "Search clinicians with structured filters. Prefer last_name/first_name/"
+                "speciality over free-text q. For pronouns like she/he, set likely_gender. "
+                "Carry forward prior constraints on follow-up turns. Always report total."
             ),
             "parameters": {
                 "type": "object",
@@ -39,11 +40,27 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     "location": {"type": "string"},
                     "county": {"type": "string"},
                     "language": {"type": "string"},
+                    "first_name": {
+                        "type": "string",
+                        "description": "Exact first name match (case-insensitive).",
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "description": "Exact last name match (case-insensitive).",
+                    },
+                    "likely_gender": {
+                        "type": "string",
+                        "enum": ["female", "male"],
+                        "description": (
+                            "Soft filter inferred from first-name lexicon when the user "
+                            "says she/he/her/him. Schema has no gender field."
+                        ),
+                    },
                     "min_rating": {"type": "number"},
                     "min_years_experience": {"type": "integer"},
                     "q": {
                         "type": "string",
-                        "description": "Name or clinic name search text",
+                        "description": "Fallback free-text over name/clinic; prefer last_name.",
                     },
                     "sort": {
                         "type": "string",
@@ -85,12 +102,15 @@ def execute_tool(db: Session, name: str, arguments: dict[str, Any]) -> str:
     if name == "search_clinicians":
         limit = min(int(arguments.get("limit") or 10), settings.max_search_limit)
         offset = max(int(arguments.get("offset") or 0), 0)
-        items, total = clinician_service.search_clinicians(
+        items, total, applied_filters = clinician_service.search_clinicians(
             db,
             speciality=arguments.get("speciality"),
             location=arguments.get("location"),
             county=arguments.get("county"),
             language=arguments.get("language"),
+            first_name=arguments.get("first_name"),
+            last_name=arguments.get("last_name"),
+            likely_gender=arguments.get("likely_gender"),
             min_rating=arguments.get("min_rating"),
             min_years_experience=arguments.get("min_years_experience"),
             q=arguments.get("q"),
@@ -101,9 +121,18 @@ def execute_tool(db: Session, name: str, arguments: dict[str, Any]) -> str:
         )
         payload = {
             "total": total,
+            "returned": len(items),
             "limit": limit,
             "offset": offset,
+            "applied_filters": applied_filters,
             "items": [item.model_dump() for item in items],
+            "guidance": (
+                f"Authoritative match count is {total}. Quote this exact total. "
+                "Only mention clinicians present in items. "
+                "If total > 1, ask for another constraint "
+                "(city, clinic, rating, language, etc.). Only present a single doctor "
+                "as definitive when total == 1 or the user selects an id."
+            ),
         }
         return json.dumps(payload)
 

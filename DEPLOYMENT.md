@@ -1,16 +1,62 @@
 # Deployment Next Steps
 
-How to take this demo from a local Docker image to a hosted environment **anywhere**, using containers plus IaC (**Terraform** and/or **Rancher/Kubernetes**).
+How to take this demo from a local Docker image to a hosted environment **anywhere**, using containers plus IaC (**Terraform** and/or **Rancher/Kubernetes**), or the **$0 Hugging Face Space** path.
 
 Current artifacts already in the repo:
 
 | Artifact | Purpose |
 |---|---|
+| [`gradio_app.py`](gradio_app.py) | HF Space Gradio entry (ChatInterface + scoped agent) |
+| [`requirements-space.txt`](requirements-space.txt) | Slim deps for Gradio/HF (Spaces also install [`requirements.txt`](requirements.txt)) |
 | [`Dockerfile`](Dockerfile) | Production-shaped image (seed SQLite → Uvicorn `:8000`) |
 | [`docker-compose.yml`](docker-compose.yml) | Local / single-host demo |
 | [`scripts/entrypoint.sh`](scripts/entrypoint.sh) | Seeds DB if missing; **1 worker** (required for in-memory chat) |
 | App health | `GET /health` (`database_ready`, `chat_ready`) |
-| Demo UI | `GET /` |
+| Demo UI | FastAPI `GET /` or Gradio Space |
+
+---
+
+## $0 public URL — Hugging Face Space + Inference Providers
+
+**Recommended cheapest shareable demo.** Free CPU Space runs Gradio only; the LLM runs on HF Inference Providers (separate free monthly credit).
+
+```text
+Browser → Gradio on free CPU Space → scoped tool loop + SQLite
+                                   → HF Inference Providers (Qwen2.5-7B-Instruct)
+```
+
+### Deploy checklist
+
+1. Create a **public Gradio Space** (hardware: CPU basic — no credit card).
+2. **Settings → Secrets** → add `HF_TOKEN` (HF access token with permission to call Inference Providers).
+3. **Settings → Variables** (optional):
+   - `LLM_PROVIDER=hf` (also the default in `gradio_app.py`)
+   - `HF_MODEL=Qwen/Qwen2.5-7B-Instruct`
+   - `HF_PROVIDER=auto`
+4. Push this git repo to the Space remote (README YAML sets `sdk: gradio`, `app_file: gradio_app.py`).
+5. Wait for the build; open `https://huggingface.co/spaces/<user>/<space>`.
+6. Smoke test:
+   - Directory question (e.g. cardiologist in Cluj who speaks English)
+   - Follow-up turn (multi-turn history via Gradio)
+   - Out-of-scope refusal (e.g. weather / medical advice)
+
+### Local Gradio before push
+
+```bash
+pip install -r requirements-space.txt
+export LLM_PROVIDER=hf
+export HF_TOKEN=hf_xxx
+python scripts/seed_db.py
+python gradio_app.py
+```
+
+### Notes
+
+- SQLite is seeded on first Space boot from `healthcare_data.json` (~3MB in repo).
+- Do **not** load the model onto the Space CPU — inference is remote via `huggingface_hub.InferenceClient`.
+- Free Inference credit is small; fine for demos. Upgrade to PRO or pay-as-you-go if you hit limits.
+- Entry file is `gradio_app.py` (not `app.py`) so it does not collide with the Python package directory `app/`.
+- FastAPI/Docker path remains available with `LLM_PROVIDER=openai`.
 
 ---
 
@@ -259,15 +305,24 @@ Do these after the first public URL works:
 
 ## Ordered backlog (do in this order)
 
+### Path A — $0 HF Space + Vercel MCP client
+
+1. [x] HF Space: https://huggingface.co/spaces/robcr/clinician-directory-agent
+2. [x] MCP Streamable HTTP: `https://robcr-clinician-directory-agent.hf.space/gradio_api/mcp/`
+3. [x] Vercel TS client in [`web/`](web/) — deploy with Root Directory `web`
+4. [ ] Optional: rename the Vercel project and set custom domain
+
+### Path B — Docker + cloud IaC
+
 1. [ ] Confirm local `docker compose up` demo with a funded `OPENAI_API_KEY`
 2. [ ] Create container registry + push `$IMAGE:$GIT_SHA`
 3. [ ] Add CI build/push workflow
 4. [ ] **Either** scaffold `infra/terraform/` for chosen cloud **or** scaffold `infra/k8s/` (or Helm) for Rancher
-5. [ ] Store `OPENAI_API_KEY` in cloud/Rancher secrets (rotate the key that was shared in chat)
+5. [ ] Store `OPENAI_API_KEY` in cloud/Rancher secrets (rotate any key that was shared in chat)
 6. [ ] Apply IaC / deploy; attach PVC or disk at `/app/data`
 7. [ ] Point DNS + TLS at the service
 8. [ ] Smoke: `/health`, UI multi-turn, out-of-scope refusal
-9. [ ] Add uptime monitor + budget alerts on OpenAI usage
+9. [ ] Add uptime monitor + budget alerts on LLM usage
 10. [ ] (Optional) Redis sessions + Postgres when you outgrow single-replica SQLite
 
 ---

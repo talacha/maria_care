@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,7 @@ class ClinicianOut(BaseModel):
     languages: list[str]
     availability: str
     rating: float
+    likely_gender: Literal["female", "male", "unknown"] = "unknown"
 
     model_config = {"from_attributes": True}
 
@@ -29,6 +30,7 @@ class ClinicianListResponse(BaseModel):
     limit: int
     offset: int
     items: list[ClinicianOut]
+    applied_filters: dict[str, Any] = Field(default_factory=dict)
 
 
 class MetaResponse(BaseModel):

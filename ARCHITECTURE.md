@@ -121,7 +121,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 3. Expose container port `8000`.
 4. Share the public URL; users land on `/` chat.
 
-For container registry, Terraform, and Rancher/Kubernetes next steps, see [DEPLOYMENT.md](DEPLOYMENT.md).
+For container registry, Terraform, Rancher/Kubernetes, and the **$0 Hugging Face Space + Gradio** path, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Failure modes to expect
 

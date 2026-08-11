@@ -1,8 +1,9 @@
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.gender import LikelyGender, first_names_for_gender, infer_likely_gender, parse_likely_gender
 from app.models import Clinician, ClinicianLanguage
 from app.schemas import ClinicianOut, MetaResponse
 
@@ -28,6 +29,7 @@ def clinician_to_out(clinician: Clinician) -> ClinicianOut:
         languages=sorted(lang.language for lang in clinician.languages),
         availability=clinician.availability,
         rating=clinician.rating,
+        likely_gender=infer_likely_gender(clinician.first_name),
     )
 
 
@@ -40,6 +42,9 @@ def _apply_filters(
     language: str | None = None,
     min_rating: float | None = None,
     min_years_experience: int | None = None,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    likely_gender: LikelyGender | None = None,
     q: str | None = None,
 ) -> Select:
     if speciality:
@@ -58,6 +63,13 @@ def _apply_filters(
                 select(ClinicianLanguage.clinician_id).where(ClinicianLanguage.language == language)
             )
         )
+    if first_name:
+        stmt = stmt.where(Clinician.first_name.ilike(first_name.strip()))
+    if last_name:
+        stmt = stmt.where(Clinician.last_name.ilike(last_name.strip()))
+    if likely_gender in {"female", "male"}:
+        names = first_names_for_gender(likely_gender)
+        stmt = stmt.where(func.lower(Clinician.first_name).in_([n.lower() for n in names]))
     if q:
         pattern = f"%{q.strip()}%"
         stmt = stmt.where(
@@ -71,6 +83,46 @@ def _apply_filters(
     return stmt
 
 
+def _applied_filters(
+    *,
+    speciality: str | None,
+    location: str | None,
+    county: str | None,
+    language: str | None,
+    min_rating: float | None,
+    min_years_experience: int | None,
+    first_name: str | None,
+    last_name: str | None,
+    likely_gender: LikelyGender | None,
+    q: str | None,
+) -> dict[str, Any]:
+    filters: dict[str, Any] = {}
+    if speciality:
+        filters["speciality"] = speciality
+    if location:
+        filters["location"] = location
+    if county:
+        filters["county"] = county
+    if language:
+        filters["language"] = language
+    if min_rating is not None:
+        filters["min_rating"] = min_rating
+    if min_years_experience is not None:
+        filters["min_years_experience"] = min_years_experience
+    if first_name:
+        filters["first_name"] = first_name.strip()
+    if last_name:
+        filters["last_name"] = last_name.strip()
+    if likely_gender in {"female", "male"}:
+        filters["likely_gender"] = likely_gender
+        filters["likely_gender_note"] = (
+            "Inferred from first-name lexicon; schema has no gender field."
+        )
+    if q:
+        filters["q"] = q.strip()
+    return filters
+
+
 def search_clinicians(
     db: Session,
     *,
@@ -80,12 +132,19 @@ def search_clinicians(
     language: str | None = None,
     min_rating: float | None = None,
     min_years_experience: int | None = None,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    likely_gender: str | None = None,
     q: str | None = None,
     sort: SortField = "rating",
     order: SortOrder = "desc",
     limit: int = 20,
     offset: int = 0,
-) -> tuple[list[ClinicianOut], int]:
+) -> tuple[list[ClinicianOut], int, dict[str, Any]]:
+    gender = parse_likely_gender(likely_gender) if isinstance(likely_gender, str) else likely_gender
+    if gender == "unknown":
+        gender = None
+
     base = select(Clinician)
     base = _apply_filters(
         base,
@@ -95,6 +154,9 @@ def search_clinicians(
         language=language,
         min_rating=min_rating,
         min_years_experience=min_years_experience,
+        first_name=first_name,
+        last_name=last_name,
+        likely_gender=gender,
         q=q,
     )
 
@@ -106,7 +168,19 @@ def search_clinicians(
 
     stmt = base.order_by(sort_expr, Clinician.id.asc()).limit(limit).offset(offset)
     rows = db.scalars(stmt).unique().all()
-    return [clinician_to_out(row) for row in rows], total
+    applied = _applied_filters(
+        speciality=speciality,
+        location=location,
+        county=county,
+        language=language,
+        min_rating=min_rating,
+        min_years_experience=min_years_experience,
+        first_name=first_name,
+        last_name=last_name,
+        likely_gender=gender,
+        q=q,
+    )
+    return [clinician_to_out(row) for row in rows], total, applied
 
 
 def get_clinician(db: Session, clinician_id: int) -> ClinicianOut | None:

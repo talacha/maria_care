@@ -16,19 +16,19 @@ def health(db: Session = Depends(get_db)) -> HealthResponse:
     settings = get_settings()
     try:
         count = clinician_service.clinician_count(db)
-        status = "ok" if settings.openai_api_key else "degraded"
+        status = "ok" if settings.chat_ready else "degraded"
         return HealthResponse(
             status=status,
             database_ready=True,
             clinician_count=count,
-            chat_ready=bool(settings.openai_api_key),
+            chat_ready=settings.chat_ready,
         )
     except Exception:
         return HealthResponse(
             status="degraded",
             database_ready=False,
             clinician_count=0,
-            chat_ready=bool(settings.openai_api_key),
+            chat_ready=settings.chat_ready,
         )
 
 
@@ -43,6 +43,9 @@ def list_clinicians(
     location: str | None = None,
     county: str | None = None,
     language: str | None = None,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    likely_gender: Literal["female", "male"] | None = None,
     min_rating: float | None = Query(default=None, ge=0, le=5),
     min_years_experience: int | None = Query(default=None, ge=0),
     q: str | None = None,
@@ -54,12 +57,15 @@ def list_clinicians(
 ) -> ClinicianListResponse:
     settings = get_settings()
     capped_limit = min(limit, settings.max_search_limit)
-    items, total = clinician_service.search_clinicians(
+    items, total, applied_filters = clinician_service.search_clinicians(
         db,
         speciality=speciality,
         location=location,
         county=county,
         language=language,
+        first_name=first_name,
+        last_name=last_name,
+        likely_gender=likely_gender,
         min_rating=min_rating,
         min_years_experience=min_years_experience,
         q=q,
@@ -68,7 +74,13 @@ def list_clinicians(
         limit=capped_limit,
         offset=offset,
     )
-    return ClinicianListResponse(total=total, limit=capped_limit, offset=offset, items=items)
+    return ClinicianListResponse(
+        total=total,
+        limit=capped_limit,
+        offset=offset,
+        items=items,
+        applied_filters=applied_filters,
+    )
 
 
 @router.get("/clinicians/{clinician_id}", response_model=ClinicianOut)
